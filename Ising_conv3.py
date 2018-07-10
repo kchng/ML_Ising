@@ -5,7 +5,7 @@ import data_reader
 
 sess = tf.InteractiveSession()
 
-HSF = data_reader.insert_file_info("2D10_p_replicas_38_43_50000_%.1d.txt", np.arange(1,2), load_test_data_only=False)
+HSF = data_reader.insert_file_info("/data/kelvinchngphysicist/2d10/2D10_p_replicas_38_43_50000_%.1d.txt", np.arange(1,2), load_test_data_only=False)
 HSF = HSF.categorize_data()
 
 n_x = 10
