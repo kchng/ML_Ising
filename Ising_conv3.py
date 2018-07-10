@@ -3,9 +3,52 @@ import numpy as np
 import tensorflow as tf
 import data_reader
 
+import os
+from clusterone import get_data_path, get_logs_path
+
 sess = tf.InteractiveSession()
 
-HSF = data_reader.insert_file_info("/data/kelvinchngphysicist/2d10/2D10_p_replicas_38_43_50000_%.1d.txt", np.arange(1,2), load_test_data_only=False)
+PATH_TO_LOCAL_LOGS = os.path.expanduser('~/Desktop/Clusterone/ML_Ising/logs/')
+ROOT_PATH_TO_LOCAL_DATA = os.path.expanduser('~/Desktop/Clusterone/ML_Ising')
+
+try:
+  job_name = os.environ['JOB_NAME']
+  task_index = os.environ['TASK_INDEX']
+  ps_hosts = os.environ['PS_HOSTS']
+  worker_hosts = os.environ['WORKER_HOSTS']
+except:
+  job_name = None
+  task_index = 0
+  ps_hosts = None
+  worker_hosts = None
+
+flags = tf.app.flags
+
+# Training related flags
+flags.DEFINE_string("data_dir",
+                    get_data_path(
+                        dataset_name = "kelvinchngphysict/2d10", #all mounted repo
+                        local_root = ROOT_PATH_TO_LOCAL_DATA,
+                        local_repo = "2d10",
+                        path = ''
+                        ),
+                    "Path to store logs and checkpoints. It is recommended"
+                    "to use get_logs_path() to define your logs directory."
+                    "so that you can switch from local to clusterone without"
+                    "changing your code."
+                    "If you set your logs directory manually make sure"
+                    "to use /logs/ when running on ClusterOne cloud.")
+flags.DEFINE_string("log_dir",
+                     get_logs_path(root=PATH_TO_LOCAL_LOGS),
+                    "Path to dataset. It is recommended to use get_data_path()"
+                    "to define your data directory.so that you can switch "
+                    "from local to clusterone without changing your code."
+                    "If you set the data directory manually makue sure to use"
+                    "/data/ as root path when running on ClusterOne cloud.")
+
+FLAGS = flags.FLAGS
+
+HSF = data_reader.insert_file_info(FLAGS.data_dir+"2D10_p_replicas_38_43_50000_%.1d.txt", np.arange(1,2), load_test_data_only=False)
 HSF = HSF.categorize_data()
 
 n_x = 10
@@ -98,7 +141,7 @@ correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 # Before Variables can be used within a session, they must be initialized
 # using that session.
-sess.run(tf.initialize_all_variables())
+sess.run(tf.global_variables_initializer())
 
 # Training
 
@@ -111,4 +154,4 @@ for i in range(100):
       print('step %d, training accuracy %g' % (i, train_accuracy))
     train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
 
-np.savetxt("test.txt",train_accuracy)
+np.savetxt("test.txt",np.array([train_accuracy]))
