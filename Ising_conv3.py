@@ -27,7 +27,7 @@ flags = tf.app.flags
 # Training related flags
 flags.DEFINE_string("data_dir",
                     get_data_path(
-                        dataset_name = "kelvinchngphysict/2d10", #all mounted repo
+                        dataset_name = "kelvinchngphysicist/2d10", #all mounted repo
                         local_root = ROOT_PATH_TO_LOCAL_DATA,
                         local_repo = "2d10",
                         path = ''
