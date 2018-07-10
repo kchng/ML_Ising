@@ -51,7 +51,7 @@ FLAGS = flags.FLAGS
 HSF = data_reader.insert_file_info(FLAGS.data_dir+"2D10_p_replicas_38_43_50000_%.1d.txt", np.arange(1,2), load_test_data_only=False)
 HSF = HSF.categorize_data()
 
-print(HSF.train.images)
+# print(HSF.train.images)
 
 n_x = 10
 n_output_neuron = 2
