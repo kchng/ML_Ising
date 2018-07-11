@@ -234,4 +234,4 @@ if eta_policy not in ['test'] :
     for i in range(n_test_data) :
         table[Ising.test.temps[i]==table[:,0],1] += np.argmax(y_conv.eval(feed_dict={x: Ising.test.images[i,:].reshape(1,100), keep_prob: 1.0}))
 
-    np.savetxt(FLAGS.log_dir+"/Ising2D30_output.txt",table)
+    np.savetxt(FLAGS.log_dir+"/Ising2D30_output_eta%.3e_%.3e.txt"%(eta0,etaMax),table)
