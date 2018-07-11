@@ -94,11 +94,7 @@ if eta_policy in ['cyclical_traig', 'Cyclial triangular'] :
         cycle_multiplier=1
 
     eta_tmp = signal.triang(n_train_iter_per_epoch*cycle_multiplier)*(etaMax-eta0)+eta0
-
-    if n_epochs > 9 :
-        cycle = 10
-    else :
-        cycle = int(n_epochs/cycle_multiplier)
+    cycle = int(n_epochs/float(cycle_multiplier))
 
     eta = np.ones(n_train_iter)*eta0
     for i in range(cycle) :
