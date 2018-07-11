@@ -3,6 +3,7 @@ import numpy as np
 import tensorflow as tf
 import data_reader
 
+from scipy import signal
 import os
 from clusterone import get_data_path, get_logs_path
 
@@ -48,8 +49,6 @@ flags.DEFINE_string("log_dir",
 
 FLAGS = flags.FLAGS
 
-print(FLAGS.log_dir+"/output.txt")
-
 n_x = 10
 
 Ising = data_reader.insert_file_info(FLAGS.data_dir+"2D%d"%(n_x)+"_p_%.1d.txt", np.arange(1,3), load_test_data_only=False)
@@ -67,13 +66,45 @@ n_fully_connected_neuron = 16
 batch_size = 50
 n_train_data = 50000
 
-# Adaptive learning rate is used. As the training goes on, the learning rate is
-# lowered progressively using exponential decay function.
-#   Optimizer initial learning rate
-eta0 = 1e-3
+n_steps = 8000
+save_freq = 200
+n_save = n_steps/save_freq
+n_train_data = len(Ising.train.labels)
+n_epochs = (float(n_steps)*batch_size)/n_train_data
+epochs = np.linspace(0,n_epochs,n_save)
 
-#   decay rate
-decay_rate = 0.825
+eta_policy = 'cyclical_traig' # 'test'
+etaMax = 0.00035
+eta0 = 1e-6
+n_train_iter = int(float(n_train_data)*n_epochs/batch_size)
+
+if eta_policy in ['test'] :
+    eta_lower_bound = max(1e-16,eta0)
+    eta0 = eta_lower_bound
+    print('Learning rate', '%s - %s'  %(eta_lower_bound, etaMax))
+    eta = ((eta_lower_bound/etaMax)**np.linspace(1,0,n_train_iter))*etaMax
+
+if eta_policy in ['cyclical_traig', 'Cyclial triangular'] :
+    eta0 = etaMax/4.
+    n_train_iter_per_epoch =n_train_iter/n_epochs
+
+    if n_epochs > 9 : 
+        cycle_multiplier=min(2,n_epochs)
+    else :
+        cycle_multiplier=1
+
+    eta_tmp = signal.triang(n_train_iter_per_epoch*cycle_multiplier)*(etaMax-eta0)+eta0
+
+    if n_epochs > 9 :
+        cycle = 10
+    else :
+        cycle = int(n_epochs/cycle_multiplier)
+
+    eta = np.ones(n_train_iter)*eta0
+    for i in range(cycle) :
+        start = int((i*cycle_multiplier)*n_train_iter_per_epoch)
+        end   = int(((i+1)*cycle_multiplier)*n_train_iter_per_epoch)
+        eta[start:end] = eta_tmp
 
 def weight_variable(shape):
     initial = tf.truncated_normal(shape, stddev=0.1)
@@ -133,13 +164,15 @@ b_fc2 = bias_variable([n_output_neuron])
 
 y_conv = tf.nn.softmax(tf.matmul(h_fc1_drop, W_fc2) + b_fc2)
 
+learning_rate = tf.placeholder(tf.float32,shape=[])
+
 # Train and Evaluate the Model
 cross_entropy = tf.reduce_mean(-tf.reduce_sum(y_ * tf.log(y_conv), reduction_indices=[1]))
 # tf.train.exponential_decay(learning_rate, global_step, decay_steps, decay_rate, staircase=False)
 # Use adaptive learning rate
-global_step = tf.Variable(0, trainable=False)
-eta = tf.train.exponential_decay(eta0, global_step*batch_size, n_train_data, decay_rate)
-train_step = tf.train.AdamOptimizer(eta).minimize(cross_entropy, global_step=global_step)
+#global_step = tf.Variable(0, trainable=False)
+# eta = tf.train.exponential_decay(eta0, global_step*batch_size, n_train_data, decay_rate)
+train_step = tf.train.AdamOptimizer(learning_rate=learning_rate).minimize(cross_entropy)
 correct_prediction = tf.equal(tf.argmax(y_conv,1), tf.argmax(y_,1))
 accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 # Before Variables can be used within a session, they must be initialized
@@ -148,41 +181,47 @@ sess.run(tf.global_variables_initializer())
 
 # Training
 
-n_steps = 800
-n_save = n_steps/100
-
-print len(Ising.train.labels)
-
-n_epochs = (float(n_steps)*batch_size)/len(Ising.train.labels)
-epochs = np.linspace(0,n_epochs,n_save)
-
-training_table = np.zeros((n_save,3))
+training_table = np.zeros((n_save,4))
 training_table[:,0] = epochs
 
 n = 0
 for i in range(n_steps):
 
     batch = Ising.train.next_batch(50)
-    if i % 100 == 0:
-      train_accuracy = accuracy.eval(feed_dict={
-          x: Ising.train.images, y_: Ising.train.labels, keep_prob: 1.0})
-      test_accuracy = accuracy.eval(feed_dict={
-          x: Ising.test.images, y_: Ising.test.labels, keep_prob: 1.0})
-      training_table[n,1], training_table[n,2] = train_accuracy, test_accuracy
-      print('step %d, training accuracy %g, testing accuracy %g' % (i, train_accuracy, test_accuracy))
-      n+=1
-    train_step.run(feed_dict={x: batch[0], y_: batch[1], keep_prob: 0.5})
+    if eta_policy in ['test'] :
+      if i % save_freq == 0:
+        test_accuracy = accuracy.eval(feed_dict={
+            x: Ising.test.images, y_: Ising.test.labels, keep_prob: 1.0})
+        training_table[n,0], training_table[n,1] = eta[i], test_accuracy
+        print('step %d, eta %g, testing accuracy %g' % (i, eta[i], test_accuracy))
+        n+=1
+    else :
+      if i % save_freq == 0:
+        train_accuracy = accuracy.eval(feed_dict={
+            x: Ising.train.images, y_: Ising.train.labels, keep_prob: 1.0})
+        test_accuracy = accuracy.eval(feed_dict={
+            x: Ising.test.images, y_: Ising.test.labels, keep_prob: 1.0})
+        training_table[n,1], training_table[n,2], training_table[n,3] = eta[i], train_accuracy, test_accuracy
+        print('step %d, training accuracy %g, testing accuracy %g' % (i, train_accuracy, test_accuracy))
+        n+=1
+    train_step.run(feed_dict={x: batch[0], y_: batch[1], learning_rate: eta[i], keep_prob: 0.5})
 
-n_test_data = len(Ising.test.labels)
+if eta_policy in ['test'] :
+    np.savetxt(FLAGS.log_dir+"/Ising2D10_LRtest_eta%.3f_.3f.txt"%(eta0,etaMax),training_table[:,:2])
+else :
+    np.savetxt(FLAGS.log_dir+"/Ising2D10_CLR_eta%.3f_.3f.txt"%(eta0,etaMax),training_table)
 
-print('test accuracy %g' % accuracy.eval(feed_dict={
-    x: Ising.test.images, y_: Ising.test.labels, keep_prob: 1.0}))
+if eta_policy not in ['test'] :
+    n_test_data = len(Ising.test.labels)
 
-n_temp = len(np.unique(Ising.test.temps))
-table = np.zeros((n_temp,2))
-table[:,0] = np.unique(Ising.test.temps)
+    print('test accuracy %g' % accuracy.eval(feed_dict={
+        x: Ising.test.images, y_: Ising.test.labels, keep_prob: 1.0}))
 
-for i in range(n_test_data) :
-    table[Ising.test.temps[i]==table[:,0],1] += np.argmax(y_conv.eval(feed_dict={x: Ising.test.images[i,:].reshape(1,100), keep_prob: 1.0}))
+    n_temp = len(np.unique(Ising.test.temps))
+    table = np.zeros((n_temp,2))
+    table[:,0] = np.unique(Ising.test.temps)
 
-np.savetxt(FLAGS.log_dir+"/Ising2D10_output.txt",table)
+    for i in range(n_test_data) :
+        table[Ising.test.temps[i]==table[:,0],1] += np.argmax(y_conv.eval(feed_dict={x: Ising.test.images[i,:].reshape(1,100), keep_prob: 1.0}))
+
+    np.savetxt(FLAGS.log_dir+"/Ising2D10_output.txt",table)
