@@ -221,9 +221,9 @@ for i in range(n_steps):
     train_step.run(feed_dict={x: batch[0], y_: batch[1], learning_rate: eta[i], keep_prob: 0.5})
 
 if eta_policy in ['test'] :
-    np.savetxt(FLAGS.log_dir+"/Ising2D30_LRtest_eta%.3f_.3f.txt"%(eta0,etaMax),training_table[:,:2])
+    np.savetxt(FLAGS.log_dir+"/Ising2D30_LRtest_eta%.3f_%.3f.txt"%(eta0,etaMax),training_table[:,:2])
 else :
-    np.savetxt(FLAGS.log_dir+"/Ising2D30_CLR_eta%.3f_.3f.txt"%(eta0,etaMax),training_table)
+    np.savetxt(FLAGS.log_dir+"/Ising2D30_CLR_eta%.3f_$.3f.txt"%(eta0,etaMax),training_table)
 
 if eta_policy not in ['test'] :
     n_test_data = len(Ising.test.labels)
