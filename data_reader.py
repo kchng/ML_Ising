@@ -128,6 +128,10 @@ class insert_file_info :
                 start = 0
                 self._index_in_epoch = self.batch_size
                 assert self.batch_size <= self._ndata
+            else :
+                random.shuffle(self.shuffle_index)
+                self._images = self._images[self.shuffle_index]
+                self._labels = self._labels[self.shuffle_index]
             end = self._index_in_epoch
             return self._images[start:end], self._labels[start:end]
 
@@ -282,8 +286,8 @@ class insert_file_info :
            nfile_val   = nfile_test
         else :
            # Use 15% of the data for testing, the remaining for training
-           nfile_train = int(self.nfile*.85)
-           nfile_test  = int(self.nfile*.15)
+           nfile_train = int(self.nfile*.5)
+           nfile_test  = int(self.nfile*.5)
            nfile_val   = 0
     
         n_data_check = self.nfile - ( nfile_train + nfile_test + nfile_val )
@@ -303,7 +307,7 @@ class insert_file_info :
             for i in range(nfile_train) :
                 print('%.1fs. Loading file %d.' % (time.time()-start_time, i+1))
                 TRAIN_DATA[i*self.nrows:(i+1)*self.nrows,:] = np.loadtxt(self.full_file_path%(i+1))
-            train_images = TRAIN_DATA[:,:-1].astype('int')
+            train_images = TRAIN_DATA[:,1:-1].astype('int')
             if make_spin_down_negative :
                 train_images[train_images==0] = -1
             train_labels = TRAIN_DATA[:,-1].astype('int')
@@ -318,13 +322,13 @@ class insert_file_info :
         for i in range(nfile_test) :
             print('%.1fs. Loading file %d.' % (time.time()-start_time, i+1))
             TEST_DATA[i*self.nrows:(i+1)*self.nrows,:] = np.loadtxt(self.full_file_path%(i+1+nfile_train))
-        test_images = TEST_DATA[:,:-2].astype('int')
+        test_images = TEST_DATA[:,1:-1].astype('int')
         if make_spin_down_negative :
             test_images[test_images==0] = -1
-        test_labels = TEST_DATA[:,-2].astype('int')
+        test_labels = TEST_DATA[:,-1].astype('int')
         if convert_test_labels_to_one_hot :
             test_labels = convert_to_one_hot(test_labels)
-        test_temps  = TEST_DATA[:,-1].astype('int')    
+        test_temps  = TEST_DATA[:,0] 
         test_signs  = []
 
         if self.include_validation_data :
@@ -378,8 +382,8 @@ class insert_file_info :
            nfile_val   = nfile_test
         else :
            # Use 10% of the data each for testing, the remaining for training    
-           nfile_train = int(self.nfile*.85)
-           nfile_test  = int(self.nfile*.15)
+           nfile_train = int(self.nfile*.5)
+           nfile_test  = int(self.nfile*.5)
            nfile_val   = 0
 
         n_data_check = self.nfile - ( nfile_train + nfile_test + nfile_val )
